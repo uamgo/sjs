@@ -4,8 +4,8 @@
 ```
 create table act_num 
 (
-account_id varchar(11),  --账户
-sec_code    varchar(9),  --产品代码
+account_id char(11),  --账户
+sec_code    char(9),  --产品代码
 num         bigint,      --交易数量
 up_time     timestamp
 );
@@ -48,3 +48,20 @@ CREATE TABLE TRADE_CMF
 #2：数据文件地址  
 #3：批量处理的数据的批大小  
 #4：schema名字  
+
+
+### 校验数据一致性的SQL,打印0条数据表示所有数据一致    
+```
+select b.*, c.num from (
+select a.ACCT_ID acct_id, a.SEC_CODE sec_code, count(1), sum(a.vol) vol from (select BUY_SEC_CODE sec_code, BUY_ACCT_ID acct_id, BUY_TRADE_VOL vol from TRADE_CMF union all
+select SELL_SEC_CODE sec_code, SELL_ACCT_ID acct_id,0-SELL_TRADE_VOL vol from TRADE_CMF) a group by a.ACCT_ID, a.SEC_CODE having count(1) >1
+) b, act_num c where b.acct_id=c.account_id and b.sec_code=c.sec_code and b.vol <> c.num;
+```
+
+### 检查具体不一致的交易数据，第一条sql是查询买卖双方的交易数据，整数为买方，负数为卖方；第二条是查询持仓余额数     
+```
+select * from (select BUY_SEC_CODE sec_code, BUY_ACCT_ID acct_id, BUY_TRADE_VOL vol from TRADE_CMF union all
+select SELL_SEC_CODE sec_code, SELL_ACCT_ID acct_id,0-SELL_TRADE_VOL vol from TRADE_CMF) a, act_num b where a.acct_id=b.account_id and a.acct_id='1132724617';
+
+select * from act_num where account_id='1132724617';
+```
