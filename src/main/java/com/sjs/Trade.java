@@ -8,7 +8,11 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
@@ -53,6 +57,11 @@ public class Trade {
             schema + "act_num");
         System.out.println(tradeUpsertSql);
         String url = "jdbc:t4jdbc://" + ip + ":23400/:";
+        Map<String, String[]> dataMap = new HashMap<String, String[]>(2*batchSize);
+        String[][] dataBuffer = new String[2*batchSize][];
+        for (int i = 0; i < 2 * batchSize; i++) {
+            dataBuffer[i] = new String[3];
+        }
         Connection conn = null;
         try {
             conn = DriverManager.getConnection(url, name, pwd);
@@ -121,19 +130,41 @@ public class Trade {
                     ps.setString(21, String.valueOf(obj.sell.reserved));
                     ps.setString(22, String.valueOf(obj.sell.rsrv));
                     ps.addBatch();
+                    String key = obj.buy.acct_id.replaceFirst("(\\d+).*", "$1") +
+                        obj.buy.sec_code.replaceFirst("(\\d+).*", "$1");
+                    if (dataMap.containsKey(key)) {
+                        dataMap.get(key)[2] = String
+                            .valueOf(Long.valueOf(dataMap.get(key)[2]) + obj.buy.trade_vol);
+                    } else {
+                        dataBuffer[batchIndex][0] = String.valueOf(obj.buy.acct_id).trim();
+                        dataBuffer[batchIndex][1] = String.valueOf(obj.buy.sec_code).trim();
+                        dataBuffer[batchIndex][2] = String.valueOf(obj.buy.trade_vol);
+                        dataMap.put(key, dataBuffer[batchIndex]);
+                    }
 
-                    tradeUpsertPs.setString(1, String.valueOf(obj.buy.acct_id).trim());
-                    tradeUpsertPs.setString(2, String.valueOf(obj.buy.sec_code).trim());
-                    tradeUpsertPs.setString(3, String.valueOf(obj.buy.trade_vol).trim());
-//                    tradeUpsertPs.addBatch();
-//                    tradeUpsertPs.executeBatch();
-                    tradeUpsertPs.execute();
-                    tradeUpsertPs.setString(1, String.valueOf(obj.sell.acct_id).trim());
-                    tradeUpsertPs.setString(2, String.valueOf(obj.sell.sec_code).trim());
-                    tradeUpsertPs.setString(3, String.valueOf(0 - obj.sell.trade_vol).trim());
-//                    tradeUpsertPs.addBatch();
-//                    tradeUpsertPs.executeBatch();
-                    tradeUpsertPs.execute();
+                    key = obj.sell.acct_id.replaceFirst("(\\d+).*", "$1") +
+                        obj.sell.sec_code.replaceFirst("(\\d+).*", "$1");
+                    if (dataMap.containsKey(key)) {
+                        dataMap.get(key)[2] = String
+                            .valueOf(Long.valueOf(dataMap.get(key)[2]) - obj.sell.trade_vol);
+                    } else {
+                        dataBuffer[batchSize + batchIndex][0] = String.valueOf(obj.sell.acct_id)
+                            .trim();
+                        dataBuffer[batchSize + batchIndex][1] = String.valueOf(obj.sell.sec_code)
+                            .trim();
+                        dataBuffer[batchSize + batchIndex][2] = String
+                            .valueOf(0 - obj.sell.trade_vol);
+                        dataMap.put(key, dataBuffer[batchSize + batchIndex]);
+                    }
+
+//                    tradeUpsertPs.setString(1, String.valueOf(obj.buy.acct_id).trim());
+//                    tradeUpsertPs.setString(2, String.valueOf(obj.buy.sec_code).trim());
+//                    tradeUpsertPs.setString(3, String.valueOf(obj.buy.trade_vol).trim());
+//                    tradeUpsertPs.execute();
+//                    tradeUpsertPs.setString(1, String.valueOf(obj.sell.acct_id).trim());
+//                    tradeUpsertPs.setString(2, String.valueOf(obj.sell.sec_code).trim());
+//                    tradeUpsertPs.setString(3, String.valueOf(0 - obj.sell.trade_vol).trim());
+//                    tradeUpsertPs.execute();
 //                    System.out.println(String.format("%d,%d,%d,%d,%d,%d",
 //                        String.valueOf(obj.buy.acct_id).length(),
 //                        String.valueOf(obj.buy.acct_id).length(),
@@ -145,7 +176,15 @@ public class Trade {
                     ++totalRows;
                     ++batchIndex;
                     if (batchIndex >= batchSize) {
-//                        tradeUpsertPs.executeBatch();
+                        for (String[] values : dataMap.values()) {
+                            tradeUpsertPs.setString(1, values[0]);
+                            tradeUpsertPs.setString(2, values[1]);
+                            tradeUpsertPs.setString(3, values[2]);
+                            tradeUpsertPs.addBatch();
+                        }
+                        tradeUpsertPs.executeBatch();
+                        dataMap.clear();
+
                         ps.executeBatch();
                         batchIndex = 0;
                         long batchEnd = System.currentTimeMillis();
@@ -156,7 +195,14 @@ public class Trade {
                     }
                 } else {
                     if (batchIndex > 0) {
-//                        tradeUpsertPs.executeBatch();
+                        for (String[] values : dataMap.values()) {
+                            tradeUpsertPs.setString(1, values[0]);
+                            tradeUpsertPs.setString(2, values[1]);
+                            tradeUpsertPs.setString(3, values[2]);
+                            tradeUpsertPs.addBatch();
+                        }
+                        tradeUpsertPs.executeBatch();
+                        dataMap.clear();
                         ps.executeBatch();
                         long batchEnd = System.currentTimeMillis();
                         System.out.println(
