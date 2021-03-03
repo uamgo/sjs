@@ -98,38 +98,42 @@ public class Trade {
 //                order_no, trade_dir, trade_price,
 //                trade_vol, ts, pbu, reserved,rsrv
 //                    System.out.println("obj.sell.trade_dir : " + obj.sell.trade_dir);
-                    ps.setString(1, String.valueOf(obj.buy.sec_code));
+                    ps.setString(1, String.valueOf(obj.buy.sec_code).trim());
                     ps.setString(2, String.valueOf(obj.buy.act_no));
-                    ps.setString(3, String.valueOf(obj.buy.acct_id));
+                    ps.setString(3, String.valueOf(obj.buy.acct_id).trim());
                     ps.setString(4, String.valueOf(obj.buy.order_no));
                     ps.setString(5, obj.buy.trade_dir);
                     ps.setString(6, String.valueOf(obj.buy.trade_price));
-                    ps.setString(7, String.valueOf(obj.buy.trade_vol));
+                    ps.setString(7, String.valueOf(obj.buy.trade_vol).trim());
                     ps.setString(8, String.valueOf(obj.buy.ts));
                     ps.setString(9, String.valueOf(obj.buy.pbu));
                     ps.setString(10, String.valueOf(obj.buy.reserved));
                     ps.setString(11, String.valueOf(obj.buy.rsrv));
-                    ps.setString(12, String.valueOf(obj.sell.sec_code));
+                    ps.setString(12, String.valueOf(obj.sell.sec_code).trim());
                     ps.setString(13, String.valueOf(obj.sell.act_no));
-                    ps.setString(14, String.valueOf(obj.sell.acct_id));
+                    ps.setString(14, String.valueOf(obj.sell.acct_id).trim());
                     ps.setString(15, String.valueOf(obj.sell.order_no));
                     ps.setString(16, obj.sell.trade_dir);
                     ps.setString(17, String.valueOf(obj.sell.trade_price));
-                    ps.setString(18, String.valueOf(obj.sell.trade_vol));
+                    ps.setString(18, String.valueOf(obj.sell.trade_vol).trim());
                     ps.setString(19, String.valueOf(obj.sell.ts));
                     ps.setString(20, String.valueOf(obj.sell.pbu));
                     ps.setString(21, String.valueOf(obj.sell.reserved));
                     ps.setString(22, String.valueOf(obj.sell.rsrv));
                     ps.addBatch();
 
-                    tradeUpsertPs.setString(1, String.valueOf(obj.buy.acct_id));
-                    tradeUpsertPs.setString(2, String.valueOf(obj.buy.sec_code));
-                    tradeUpsertPs.setString(3, String.valueOf(obj.buy.trade_vol));
-                    tradeUpsertPs.addBatch();
-                    tradeUpsertPs.setString(1, String.valueOf(obj.sell.acct_id));
-                    tradeUpsertPs.setString(2, String.valueOf(obj.sell.sec_code));
-                    tradeUpsertPs.setString(3, String.valueOf(obj.sell.trade_vol));
-                    tradeUpsertPs.addBatch();
+                    tradeUpsertPs.setString(1, String.valueOf(obj.buy.acct_id).trim());
+                    tradeUpsertPs.setString(2, String.valueOf(obj.buy.sec_code).trim());
+                    tradeUpsertPs.setString(3, String.valueOf(obj.buy.trade_vol).trim());
+//                    tradeUpsertPs.addBatch();
+//                    tradeUpsertPs.executeBatch();
+                    tradeUpsertPs.execute();
+                    tradeUpsertPs.setString(1, String.valueOf(obj.sell.acct_id).trim());
+                    tradeUpsertPs.setString(2, String.valueOf(obj.sell.sec_code).trim());
+                    tradeUpsertPs.setString(3, String.valueOf(0 - obj.sell.trade_vol).trim());
+//                    tradeUpsertPs.addBatch();
+//                    tradeUpsertPs.executeBatch();
+                    tradeUpsertPs.execute();
 //                    System.out.println(String.format("%d,%d,%d,%d,%d,%d",
 //                        String.valueOf(obj.buy.acct_id).length(),
 //                        String.valueOf(obj.buy.acct_id).length(),
@@ -141,22 +145,22 @@ public class Trade {
                     ++totalRows;
                     ++batchIndex;
                     if (batchIndex >= batchSize) {
-                        tradeUpsertPs.executeBatch();
+//                        tradeUpsertPs.executeBatch();
                         ps.executeBatch();
                         batchIndex = 0;
                         long batchEnd = System.currentTimeMillis();
                         System.out.println(
-                            totalRows + " rows ," + totalRows * 1000 / (batchEnd - start)
+                            totalRows + " rows ," + (totalRows * 1000 / (batchEnd - start))
                                 + " rows/second");
                         conn.commit();
                     }
                 } else {
                     if (batchIndex > 0) {
-                        tradeUpsertPs.executeBatch();
+//                        tradeUpsertPs.executeBatch();
                         ps.executeBatch();
                         long batchEnd = System.currentTimeMillis();
                         System.out.println(
-                            totalRows + " rows ," + totalRows * 1000 / (batchEnd - start)
+                            totalRows + " rows ," + (totalRows * 1000 / (batchEnd - start))
                                 + " rows/second");
                         conn.commit();
                     }
@@ -164,7 +168,9 @@ public class Trade {
                 }
             }
         } catch (SQLException e) {
-            conn.rollback();
+            if (conn != null) {
+                conn.rollback();
+            }
             SQLException ee = e;
             while (ee != null) {
                 ee.printStackTrace();
