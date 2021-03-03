@@ -39,13 +39,18 @@ public class Trade {
         final String sql = "upsert using load into " + schema + "TRADE_CMF values("
             + "?,?,?,?,?,?,?,?,?,?,"
             + "?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)";
-        final String tradeSql =
-            "UPDATE " + schema + "act_num SET num=num+? where account_id=? and sec_code=?";
-        final String tradeUpsertSql =
-            "insert into " + schema + "act_num values(?,?,?,current_timestamp)";
-        Set<String> keys = new HashSet<String>();
-        boolean hasUpsert = false;
-        boolean hasUpsertTmp = false;
+
+        final String tradeUpsertSql = String.format(
+            "upsert into %1$s  "
+                + "SELECT nvl(a.account_id,b.account_id),"
+                + "nvl(a.sec_code,b.sec_code),"
+                + "nvl(a.num,0)+cast(nvl(b.trade_vol,'0') as int),"
+                + "current_timestamp "
+                + "from %1$s a right join "
+                + "(values (?,?,?)) b(account_id, sec_code, trade_vol) "
+                + "on a.account_id = b.account_id and a.sec_code = b.sec_code ",
+            schema + "act_num");
+        System.out.println(tradeUpsertSql);
         String url = "jdbc:t4jdbc://" + ip + ":23400/:";
         Connection conn = null;
         try {
@@ -54,9 +59,9 @@ public class Trade {
             st.execute("cqd traf_load_use_for_indexes 'OFF'");
             st.execute("cqd upd_ordered 'OFF'");
             st.execute("cqd traf_upsert_mode 'REPLACE'");
+            st.execute("cqd comp_int_22 '1'");
             st.close();
             PreparedStatement ps = conn.prepareStatement(sql);
-            PreparedStatement tradePs = conn.prepareStatement(tradeSql);
             PreparedStatement tradeUpsertPs = conn.prepareStatement(tradeUpsertSql);
             int batchIndex = 0;
             FileInputStream inData_;
@@ -115,29 +120,28 @@ public class Trade {
                     ps.setString(22, String.valueOf(obj.sell.rsrv));
                     ps.addBatch();
 
-                    hasUpsertTmp = addTradeBatch(keys, tradePs, tradeUpsertPs, obj.buy.trade_vol,
-                        obj.buy.sec_code,
-                        obj.buy.acct_id);
-                    if (!hasUpsert) {
-                        hasUpsert = hasUpsertTmp;
-                    }
-                    hasUpsertTmp = addTradeBatch(keys, tradePs, tradeUpsertPs, obj.sell.trade_vol,
-                        obj.sell.sec_code,
-                        obj.sell.acct_id);
-                    if (!hasUpsert) {
-                        hasUpsert = hasUpsertTmp;
-                    }
+                    tradeUpsertPs.setString(1, String.valueOf(obj.buy.acct_id));
+                    tradeUpsertPs.setString(2, String.valueOf(obj.buy.sec_code));
+                    tradeUpsertPs.setString(3, String.valueOf(obj.buy.trade_vol));
+                    tradeUpsertPs.addBatch();
+                    tradeUpsertPs.setString(1, String.valueOf(obj.sell.acct_id));
+                    tradeUpsertPs.setString(2, String.valueOf(obj.sell.sec_code));
+                    tradeUpsertPs.setString(3, String.valueOf(obj.sell.trade_vol));
+                    tradeUpsertPs.addBatch();
+//                    System.out.println(String.format("%d,%d,%d,%d,%d,%d",
+//                        String.valueOf(obj.buy.acct_id).length(),
+//                        String.valueOf(obj.buy.acct_id).length(),
+//                        String.valueOf(obj.buy.trade_vol).length(),
+//                        String.valueOf(obj.sell.acct_id).length(),
+//                        String.valueOf(obj.sell.sec_code).length(),
+//                        String.valueOf(obj.sell.trade_vol).length()));
 
                     ++totalRows;
                     ++batchIndex;
                     if (batchIndex >= batchSize) {
-                        if (hasUpsert) {
-                            tradeUpsertPs.executeBatch();
-                        }
+                        tradeUpsertPs.executeBatch();
                         ps.executeBatch();
-                        tradePs.executeBatch();
                         batchIndex = 0;
-                        hasUpsert = false;
                         long batchEnd = System.currentTimeMillis();
                         System.out.println(
                             totalRows + " rows ," + totalRows * 1000 / (batchEnd - start)
@@ -146,11 +150,8 @@ public class Trade {
                     }
                 } else {
                     if (batchIndex > 0) {
-                        if (hasUpsert) {
-                            tradeUpsertPs.executeBatch();
-                        }
+                        tradeUpsertPs.executeBatch();
                         ps.executeBatch();
-                        tradePs.executeBatch();
                         long batchEnd = System.currentTimeMillis();
                         System.out.println(
                             totalRows + " rows ," + totalRows * 1000 / (batchEnd - start)
@@ -160,7 +161,11 @@ public class Trade {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            SQLException ee = e;
+            while (ee != null) {
+                ee.printStackTrace();
+                ee = ee.getNextException();
+            }
         } finally {
             if (conn != null) {
                 try {
@@ -169,24 +174,6 @@ public class Trade {
                     e.printStackTrace();
                 }
             }
-        }
-    }
-
-    private static boolean addTradeBatch(Set<String> keys,
-        PreparedStatement tradePs, PreparedStatement tradeUpsertPs,
-        long trade_vol, String sec_code, String acct_id) throws SQLException {
-        if (keys.contains(acct_id + sec_code)) {
-            tradePs.setLong(1, trade_vol);
-            tradePs.setString(2, String.valueOf(acct_id));
-            tradePs.setString(3, String.valueOf(sec_code));
-            tradePs.addBatch();
-            return false;
-        } else {
-            tradeUpsertPs.setString(1, String.valueOf(acct_id));
-            tradeUpsertPs.setString(2, String.valueOf(sec_code));
-            tradeUpsertPs.setLong(3, trade_vol);
-            tradeUpsertPs.addBatch();
-            return true;
         }
     }
 

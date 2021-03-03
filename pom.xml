@@ -6,7 +6,7 @@
 
   <groupId>com.sjs</groupId>
   <artifactId>sjs</artifactId>
-  <version>0.4</version>
+  <version>0.5</version>
   <description>esg-sjs</description>
   <dependencies>
     <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-lang3 -->
