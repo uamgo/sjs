@@ -16,7 +16,8 @@ public class Trade {
 
     private static int total = 0;
 
-    public static void main(String[] args) throws ClassNotFoundException, InterruptedException {
+    public static void main(String[] args)
+        throws ClassNotFoundException, InterruptedException, SQLException {
         Class.forName("org.trafodion.jdbc.t4.T4Driver");
         final String ip = args[0];
         String dataFile_ = args[1];
@@ -61,6 +62,7 @@ public class Trade {
             st.execute("cqd traf_upsert_mode 'REPLACE'");
             st.execute("cqd comp_int_22 '1'");
             st.close();
+            conn.setAutoCommit(false);
             PreparedStatement ps = conn.prepareStatement(sql);
             PreparedStatement tradeUpsertPs = conn.prepareStatement(tradeUpsertSql);
             int batchIndex = 0;
@@ -146,7 +148,7 @@ public class Trade {
                         System.out.println(
                             totalRows + " rows ," + totalRows * 1000 / (batchEnd - start)
                                 + " rows/second");
-
+                        conn.commit();
                     }
                 } else {
                     if (batchIndex > 0) {
@@ -156,11 +158,13 @@ public class Trade {
                         System.out.println(
                             totalRows + " rows ," + totalRows * 1000 / (batchEnd - start)
                                 + " rows/second");
+                        conn.commit();
                     }
                     break;
                 }
             }
         } catch (SQLException e) {
+            conn.rollback();
             SQLException ee = e;
             while (ee != null) {
                 ee.printStackTrace();
