@@ -5,6 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 
 class TradeRecord implements DataInterface {
+
     String sec_code;         // C9
     long act_no;             // I8
     String acct_id;          // C11
@@ -26,19 +27,19 @@ class TradeRecord implements DataInterface {
     public boolean deserialize(byte[] buffer, int offset) {
         int idx = offset;
 
-        sec_code = new String(buffer, idx,9);
+        sec_code = new String(buffer, idx, 9);
         idx += 9;
 
         act_no = MsgUtil.int64FromBytes(buffer, idx);
         idx += 8;
 
-        acct_id = new String(buffer, idx,11);
+        acct_id = new String(buffer, idx, 11);
         idx += 11;
 
         order_no = MsgUtil.int64FromBytes(buffer, idx);
         idx += 8;
 
-        trade_dir = new String(buffer, idx,1);
+        trade_dir = new String(buffer, idx, 1);
         idx += 1;
 
         trade_price = MsgUtil.int64FromBytes(buffer, idx);
@@ -56,7 +57,7 @@ class TradeRecord implements DataInterface {
         reserved = MsgUtil.uint32BizFromBytes(buffer, idx);
         idx += 4;
 
-        rsrv = new String(buffer, idx,3);
+        rsrv = new String(buffer, idx, 3);
         rsrv = "";
         idx += 3;
 
@@ -65,9 +66,9 @@ class TradeRecord implements DataInterface {
 
     public String toString() {
         return String.format("%s|%d|%s|%d|%s|%d|%d|%d|%d|%d|%s",
-                sec_code, act_no, acct_id,
-                order_no, trade_dir, trade_price,
-                trade_vol, ts, pbu, reserved,rsrv);
+            sec_code, act_no, acct_id,
+            order_no, trade_dir, trade_price,
+            trade_vol, ts, pbu, reserved, rsrv);
     }
 
     @Override
@@ -75,6 +76,19 @@ class TradeRecord implements DataInterface {
         ts = System.currentTimeMillis() * 1000000;
     }
 
+    public void clone(TradeRecord record) {
+        sec_code = record.sec_code;
+        act_no = record.act_no;
+        acct_id = record.acct_id;
+        order_no = record.order_no;
+        trade_dir = record.trade_dir;
+        trade_price = record.trade_price;
+        trade_vol = record.trade_vol;
+        ts = record.ts;
+        pbu = record.pbu;
+        reserved = record.reserved;
+        rsrv = record.rsrv;
+    }
 }
 
 public class TradeConfirm implements DataInterface {
@@ -150,4 +164,9 @@ public class TradeConfirm implements DataInterface {
         }
     }
 
+    public TradeConfirm clone(TradeConfirm toClone) {
+        this.buy.clone(toClone.buy);
+        this.sell.clone(toClone.sell);
+        return this;
+    }
 }

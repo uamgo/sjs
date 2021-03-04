@@ -11,6 +11,7 @@ public class TestBatch {
         Class.forName("org.trafodion.jdbc.t4.T4Driver");
         String url = "jdbc:t4jdbc://10.9.0.220:23400/:";
         Connection conn = DriverManager.getConnection(url, "trafodion", "traf123");
+
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1,"2");
         ps.setString(2,"10");
