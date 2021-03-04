@@ -86,6 +86,7 @@ public class Trade extends Thread {
             pool.submit(new Trade(i));
         }
         try {
+            pool.shutdown();
             pool.awaitTermination(10, TimeUnit.DAYS);
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -262,22 +263,14 @@ public class Trade extends Thread {
         if (endOfFile) {
             return null;
         }
-        Trade trade = map.get(id);
-        if (trade.hasBufferData()) {
-            return trade.getStartTradeConfirm();
-        }
         try {
             LOCK.lock();
+            TradeConfirm tmpTradeConfirm = new TradeConfirm();
             int len = inData_.read(bufferG);
             if (len != -1 && len == tmpTradeConfirm.size()) {
                 tmpTradeConfirm.deserialize(bufferG, 0);
                 tmpTradeConfirm.updateTimestamp();
-                Integer hash = hashSecCode(tmpTradeConfirm.buy.sec_code);
-                if (hash == id) {
-                    return map.get(hash).getTradeConfirm(tmpTradeConfirm);
-                } else {
-                    return map.get(hash).addTradeConfirm(tmpTradeConfirm);
-                }
+                return tmpTradeConfirm;
             }
         } catch (Exception e) {
             e.printStackTrace();
