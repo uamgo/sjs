@@ -2,6 +2,7 @@ package com.sjs;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -10,7 +11,9 @@ import java.sql.Statement;
 import java.sql.Types;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,6 +39,7 @@ public class Trade extends Thread {
     private static long totalRows = 0;
     private static ReentrantLock LOCK = new ReentrantLock();
     private static Map<Integer, Trade> map = new ConcurrentHashMap<Integer, Trade>();
+    private static Map<Integer, ConcurrentLinkedQueue<TradeConfirm>> tradeConfirmQueueMap = new ConcurrentHashMap<Integer, ConcurrentLinkedQueue<TradeConfirm>>();
     private static boolean endOfFile = false;
     private CountDownLatch countDownLatch = new CountDownLatch(1);
     private boolean isEmpty = true;
@@ -74,14 +78,45 @@ public class Trade extends Thread {
         } else {
             threads = 1;
         }
-        try {
-            inData_ = new FileInputStream(dataFile_);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            return;
+        for (int i = 0; i < threads; i++) {
+            tradeConfirmQueueMap.put(i,
+                new ConcurrentLinkedQueue<TradeConfirm>());
         }
+        Thread readFileThread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    inData_ = new FileInputStream(dataFile_);
+                    Queue<TradeConfirm> queue;
+                    do {
+                        TradeConfirm tmpTradeConfirm = new TradeConfirm();
+                        int len = inData_.read(bufferG);
+                        if (len != -1 && len == tmpTradeConfirm.size()) {
+                            tmpTradeConfirm.deserialize(bufferG, 0);
+                            tmpTradeConfirm.updateTimestamp();
+                            queue = tradeConfirmQueueMap
+                                .get(hashSecCode(tmpTradeConfirm.buy.sec_code));
+                            queue.offer(tmpTradeConfirm);
+                            if (queue.size() > 10000) {
+                                sleep(100);
+                            }
+                        } else {
+                            endOfFile = true;
+                        }
+
+                    } while (!endOfFile);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                    return;
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+
         startMs = System.currentTimeMillis();
-        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        ExecutorService pool = Executors.newFixedThreadPool(threads + 1);
+        pool.submit(readFileThread);
         for (int i = 0; i < threads; i++) {
             pool.submit(new Trade(i));
         }
@@ -136,7 +171,7 @@ public class Trade extends Thread {
             int batchIndex = 0;
 
             while (true) {
-                TradeConfirm obj = read(this.id);
+                TradeConfirm obj = read();
                 if (obj != null) {
                     long batchStart = System.currentTimeMillis();
                     ps.setString(1, String.valueOf(obj.buy.sec_code).trim());
@@ -194,7 +229,8 @@ public class Trade extends Thread {
                         executeBatch(conn, tradeUpsertPs, ps, dataMap, batchIndex);
                         batchIndex = 0;
                     }
-                } else {
+                    continue;
+                } else if (endOfFile) {
                     if (batchIndex > 0) {
                         executeBatch(conn, tradeUpsertPs, ps, dataMap, batchIndex);
                     }
@@ -244,12 +280,12 @@ public class Trade extends Thread {
     }
 
     private void log(int numRows) {
-        synchronized (Trade.class){
+        synchronized (Trade.class) {
             totalRows += numRows;
 
             long end = System.currentTimeMillis();
             String log = String
-                .format("Thread[%d][batchRows:%d] %d rows in total, %d rows/second",
+                .format("Thread[%d][batchRows:%d] %d transactions in total, TPS: %d ",
                     this.id, numRows, totalRows,
                     (totalRows * 1000 / (end - startMs)));
             System.out.println(log);
@@ -259,32 +295,19 @@ public class Trade extends Thread {
     private static TradeConfirm tmpTradeConfirm = new TradeConfirm();
     private static byte[] bufferG = new byte[tmpTradeConfirm.size()];
 
-    private static TradeConfirm read(int id) {
-        if (endOfFile) {
+    private TradeConfirm read() {
+        if (tradeConfirmQueueMap.get(id).size() == 0 && endOfFile) {
             return null;
         }
-        try {
-            LOCK.lock();
-            TradeConfirm tmpTradeConfirm = new TradeConfirm();
-            int len = inData_.read(bufferG);
-            if (len != -1 && len == tmpTradeConfirm.size()) {
-                tmpTradeConfirm.deserialize(bufferG, 0);
-                tmpTradeConfirm.updateTimestamp();
-                return tmpTradeConfirm;
+        TradeConfirm tradeConfirm = tradeConfirmQueueMap.get(id).poll();
+        if (tradeConfirm == null) {
+            try {
+                sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        } finally {
-            LOCK.unlock();
         }
-        try {
-            LOCK.lock();
-            endOfFile = true;
-        } finally {
-            LOCK.unlock();
-        }
-        return null;
+        return tradeConfirm;
     }
 
     private TradeConfirm currTradeConfirm = new TradeConfirm();
