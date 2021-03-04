@@ -55,7 +55,7 @@ public class Trade {
             "upsert %2$s into %1$s  "
                 + "SELECT nvl(a.account_id,b.account_id),"
                 + "nvl(a.sec_code,b.sec_code),"
-                + "nvl(a.num,0)+cast(nvl(b.trade_vol,'0') as int),"
+                + "nvl(a.num,0)+cast(b.trade_vol as int),"
                 + "current_timestamp "
                 + "from %1$s a right join "
                 + "(values (?,?,?)) b(account_id, sec_code, trade_vol) "
