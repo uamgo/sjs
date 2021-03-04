@@ -37,6 +37,12 @@ public class Trade {
         } else {
             schema = "seabase.";
         }
+        String usingLoad;
+        if (args.length > 4) {
+            usingLoad = "using load";
+        } else {
+            usingLoad = "";
+        }
         long start = System.currentTimeMillis();
         final Random r = new Random();
         final String name = "trafodion";
@@ -46,7 +52,7 @@ public class Trade {
             + "?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)";
 
         final String tradeUpsertSql = String.format(
-            "upsert into %1$s  "
+            "upsert %2$s into %1$s  "
                 + "SELECT nvl(a.account_id,b.account_id),"
                 + "nvl(a.sec_code,b.sec_code),"
                 + "nvl(a.num,0)+cast(nvl(b.trade_vol,'0') as int),"
@@ -54,7 +60,7 @@ public class Trade {
                 + "from %1$s a right join "
                 + "(values (?,?,?)) b(account_id, sec_code, trade_vol) "
                 + "on a.account_id = b.account_id and a.sec_code = b.sec_code ",
-            schema + "act_num");
+            schema + "act_num", usingLoad);
         System.out.println(tradeUpsertSql);
         String url = "jdbc:t4jdbc://" + ip + ":23400/:";
         Map<String, String[]> dataMap = new HashMap<String, String[]>(2*batchSize);
@@ -87,7 +93,7 @@ public class Trade {
             TradeConfirm obj = new TradeConfirm();
             byte[] buffer = new byte[obj.size()];
             int len = 0;
-            int totalRows = 0;
+            long totalRows = 0;
             while (true) {
                 try {
                     len = inData_.read(buffer);
@@ -156,22 +162,6 @@ public class Trade {
                             .valueOf(0 - obj.sell.trade_vol);
                         dataMap.put(key, dataBuffer[batchSize + batchIndex]);
                     }
-
-//                    tradeUpsertPs.setString(1, String.valueOf(obj.buy.acct_id).trim());
-//                    tradeUpsertPs.setString(2, String.valueOf(obj.buy.sec_code).trim());
-//                    tradeUpsertPs.setString(3, String.valueOf(obj.buy.trade_vol).trim());
-//                    tradeUpsertPs.execute();
-//                    tradeUpsertPs.setString(1, String.valueOf(obj.sell.acct_id).trim());
-//                    tradeUpsertPs.setString(2, String.valueOf(obj.sell.sec_code).trim());
-//                    tradeUpsertPs.setString(3, String.valueOf(0 - obj.sell.trade_vol).trim());
-//                    tradeUpsertPs.execute();
-//                    System.out.println(String.format("%d,%d,%d,%d,%d,%d",
-//                        String.valueOf(obj.buy.acct_id).length(),
-//                        String.valueOf(obj.buy.acct_id).length(),
-//                        String.valueOf(obj.buy.trade_vol).length(),
-//                        String.valueOf(obj.sell.acct_id).length(),
-//                        String.valueOf(obj.sell.sec_code).length(),
-//                        String.valueOf(obj.sell.trade_vol).length()));
 
                     ++totalRows;
                     ++batchIndex;

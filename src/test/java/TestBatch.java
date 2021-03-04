@@ -6,7 +6,8 @@ import java.sql.SQLException;
 public class TestBatch {
 
     public static void main(String[] args) throws ClassNotFoundException, SQLException {
-        String sql ="upsert into t8  SELECT nvl(a.id,b.id),nvl(a.num,0)+nvl(b.num,'0') from t8 a right join (values (?,?)) b(id, num) on a.id = b.id";
+//        String sql ="upsert into t8  SELECT nvl(a.id,b.id),nvl(a.num,0)+nvl(b.num,'0') from t8 a right join (values (?,?)) b(id, num) on a.id = b.id";
+        String sql ="UPDATE t8  SELECT nvl(a.id,b.id),nvl(a.num,0)+nvl(b.num,'0') from t8 a right join (values (?,?)) b(id, num) on a.id = b.id";
         Class.forName("org.trafodion.jdbc.t4.T4Driver");
         String url = "jdbc:t4jdbc://10.9.0.220:23400/:";
         Connection conn = DriverManager.getConnection(url, "trafodion", "traf123");
