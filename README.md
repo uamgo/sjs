@@ -42,12 +42,14 @@ CREATE TABLE TRADE_CMF
 
 
 ### 运行方式：   
-```java -cp ./sjs-0.2.jar:.:$CLASSPATCH com.sjs.Trade 10.10.11.16  ./xx.data 1000 seabase```  
+```java -cp ./sjs-0.2.jar:.:$CLASSPATCH com.sjs.Trade 10.10.11.16  ./xx.data 1000 seabase load 10```  
 参数说明:   
 #1: DcsMaster IP地址    
 #2：数据文件地址  
 #3：批量处理的数据的批大小  
-#4：schema名字  
+#4：schema名字 
+#5: load：启用using load；其他值则不启用  
+#6：并发数量，默认单线程处理   
 
 
 ### 校验数据一致性的SQL,打印0条数据表示所有数据一致    

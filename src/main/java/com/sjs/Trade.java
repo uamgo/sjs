@@ -68,11 +68,13 @@ public class Trade extends Thread {
         } else {
             schema = "seabase.";
         }
+        usingLoad = "";
         if (args.length > 4) {
-            usingLoad = "using load";
-        } else {
-            usingLoad = "";
+            if ("load".equals(args[4])) {
+                usingLoad = "using load";
+            }
         }
+
         if (args.length > 5) {
             threads = Integer.valueOf(args[5]);
         } else {
@@ -128,7 +130,6 @@ public class Trade extends Thread {
         }
 
     }
-
 
     private static int total = 0;
 
@@ -217,7 +218,8 @@ public class Trade extends Thread {
                     } else {
                         dataBuffer[batchSize + batchIndex][0] = String.valueOf(obj.sell.acct_id)
                             .trim();
-                        dataBuffer[batchSize + batchIndex][1] = String.valueOf(obj.sell.sec_code)
+                        dataBuffer[batchSize + batchIndex][1] = String
+                            .valueOf(obj.sell.sec_code)
                             .trim();
                         dataBuffer[batchSize + batchIndex][2] = String
                             .valueOf(0 - obj.sell.trade_vol);
